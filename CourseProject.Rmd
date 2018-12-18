@@ -1,0 +1,152 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Germán Arturo Fajardo Grimaldos"
+date: "18 de diciembre de 2018"
+output: html_document
+---
+
+# Practical Machine Learning Course Project
+##Germán Arturo Fajardo Grimaldos
+##3 de diciembre de 2018
+
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Reading Data
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+
+```{r}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+# install.packages("caret")
+# install.packages("randomForest")
+# install.packages("rpart"); 
+
+# setting initial seed for reproduceability
+set.seed(2018)
+setwd("F:/Git/08_PracticalMachineLearning/Project")
+
+##Reading and clean the training data for this project are available here:
+trainurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+trainfile <- "pml-training.csv"
+
+if (!file.exists(trainfile)){
+    download.file(url=trainurl, destfile=trainfile)
+}
+traindata <- read.csv(trainfile, na.strings = c("", "NA", "#DIV/0!"))
+
+
+##Reading and clean the test data are available here:
+testurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testfile <- "pml-testing.csv"
+
+if (!file.exists(testfile)){
+    download.file(url=testurl, destfile=testfile)
+}
+testdata <- read.csv(testfile, na.strings = c("", "NA", "#DIV/0!"))
+
+dim(testdata)
+dim(traindata)
+
+```
+
+## Preparing data 
+
+
+
+
+```{R}
+library(caret)
+
+#1. Remove columns with more than 50% of itens in null,NA or zero
+tr <- traindata[colMeans(is.na(traindata)) <= 0.5]
+te <- testdata[colMeans(is.na(testdata)) <= 0.5]
+
+#2. Remove unusabe columns
+ctrain   <-tr[,-c(1:7)]
+ctest <- te[,-c(1:7)]
+dim(ctrain)
+dim(ctest)
+
+#3. Creating new Traing data using 0.75 of original train Data 
+ttrains <- createDataPartition(y=ctrain$classe, p=0.75, list=FALSE)
+Ttrains  <- ctrain[ttrains, ] 
+Ttests <- ctrain[-ttrains, ]
+
+dim(Ttrains)
+dim(Ttests)
+
+```
+
+## Exploratory Data
+```{R}
+library(lattice)
+library(ggplot2)
+
+summary(Ttrains$classe)
+
+#Ploting new dataset by class
+plot(Ttrains$classe, col="yellow", main="Levels of variable classe within the Ttrains", xlab="classe", ylab="Frequency")
+
+``` 
+
+From the graph, it can be concluded that the dimensions of the frequencies are in the same magnitude
+
+
+
+##Prediction model 1: Decision Tree
+```{r}
+library(rpart)
+library(rpart.plot)
+
+model1 <- rpart(classe ~ ., data=Ttrains, method="class")
+
+# Predicting:
+prediction1 <- predict(model1, Ttests, type = "class")
+
+# Plot of the Decision Tree
+rpart.plot(model1, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+
+
+# Test results on our TestTrainingSet data set:
+confusionMatrix(prediction1, Ttests$classe)
+```
+
+##Prediction model 2: Random Forest
+```{R}
+library(randomForest)
+
+model2 <- randomForest(classe ~. , data=Ttrains, method="class")
+
+# Predicting:
+prediction2 <- predict(model2, Ttests, type = "class")
+
+# Test results on Ttests data set:
+confusionMatrix(prediction2, Ttests$classe)
+
+```
+
+
+##Decision on which Prediction Model to Use:
+
+Random Forest algorithm performed better than Decision Trees. Accuracy for Random Forest model was 0.995 (95% CI: (0.993, 0.997)) compared to Decision Tree model with 0.739 (95% CI: (0.727, 0.752)). The Random Forests model is choosen. The expected out-of-sample error is estimated at 0.005, or 0.5%.
+Submission
+
+Here is the final outcome based on the Prediction Model 2 (Random Forest) applied against the Testing dataset
+
+# Predict outcome levels on the original Testing data set using Random Forest algorithm
+
+```{R}
+predictfinal <- predict(model2, ctest, type="class")
+predictfinal
+```
+
+##References
+1. http://www.dataanalytictips.com/machine-learning-predicting-quality-exercise/
+2. http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf
+3. https://www.researchgate.net/publication/221258784_Human_Activity_Recognition_from_Accelerometer_Data_Using_a_Wearable_Device
+4. http://groupware.les.inf.puc-rio.br/public/papers/2012.Ugulino.WearableComputing.HAR.Classifier.RIBBON.pdf
